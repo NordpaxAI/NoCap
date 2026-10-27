@@ -22,6 +22,7 @@ export type VoteRecord = {
   allowMultiple: boolean;
   options: { label: string; count: number }[];
   voters: { name: string; email: string; choice: string | null; castAt: Date | null }[];
+  excluded: { name: string; email: string }[];
 };
 
 const OUTCOME: Record<string, string> = {
@@ -87,6 +88,11 @@ export async function buildVoteRecordPdf(record: VoteRecord): Promise<Buffer> {
       : "did not vote";
     draw(`${voter.name} (${voter.email}) — ${choice}`);
   }
+  if (record.excluded.length) {
+    y -= 4;
+    draw("Excluded from this vote by the admin (not eligible, not counted for the quorum)", { bold: true, size: 12, gap: 4 });
+    for (const person of record.excluded) draw(`${person.name} (${person.email})`);
+  }
   y -= 6;
   const participation =
     record.eligibleCount === 0 ? 0 : Math.round((record.votedCount / record.eligibleCount) * 1000) / 10;
@@ -107,16 +113,17 @@ export async function buildVoteRecordPdf(record: VoteRecord): Promise<Buffer> {
       draw("Shares are of the people who voted. Someone who picks more than one option is counted in each option.");
     }
   } else {
-    const forShare = record.votedCount === 0 ? 0 : Math.round((record.forCount / record.votedCount) * 1000) / 10;
+    const decided = record.forCount + record.againstCount;
+    const forShare = decided === 0 ? 0 : Math.round((record.forCount / decided) * 1000) / 10;
     draw(
       `Constitutive quorum: ${record.quorumConstitutive}% of eligible voters. ` +
         `${record.votedCount} of ${record.eligibleCount} voted (${participation}%). ` +
         `Abstentions count as participation. ${record.constitutiveMet ? "Met." : "Not met."}`,
     );
     draw(
-      `Deliberative quorum: ${record.quorumDeliberative}% of votes cast in favour. ` +
-        `${record.forCount} for, ${record.againstCount} against, ${record.abstainCount} abstain ` +
-        `(${forShare}% for). ${record.deliberativeMet ? "Met." : "Not met."}`,
+      `Majority (deliberative quorum): ${record.quorumDeliberative}% For, calculated on For and Against only. ` +
+        `${record.forCount} for, ${record.againstCount} against (${forShare}% for); ` +
+        `${record.abstainCount} abstain, counted for the constitutive quorum only. ${record.deliberativeMet ? "Met." : "Not met."}`,
       { gap: 8 },
     );
     draw(`Outcome: ${OUTCOME[record.outcome] ?? record.outcome}`, { bold: true, size: 13 });

@@ -26,6 +26,7 @@ export type AreaFrameRow = {
   notes: AreaNote[] | null;
   needs_maintenance: boolean;
   has_article: boolean;
+  pending_votes: number;
 };
 
 export async function fetchAreaFrame(tokenHash: string): Promise<AreaFrameRow | null> {
@@ -38,7 +39,13 @@ export async function fetchAreaFrame(tokenHash: string): Promise<AreaFrameRow | 
               SELECT 1 FROM votes v
               WHERE v.status = 'open' AND v.deadline <= now() + interval '48 hours'
             ) AS needs_maintenance,
-            EXISTS (SELECT 1 FROM article_assignments aa WHERE aa.member_id = p.id) AS has_article
+            EXISTS (SELECT 1 FROM article_assignments aa WHERE aa.member_id = p.id) AS has_article,
+            (SELECT count(*)::int FROM votes v
+             JOIN vote_electorate e ON e.vote_id = v.id AND e.profile_id = p.id
+             WHERE v.status = 'open' AND v.deadline > now()
+               AND NOT EXISTS (SELECT 1 FROM ballots b WHERE b.vote_id = v.id AND b.voter_id = p.id)
+               AND NOT EXISTS (SELECT 1 FROM poll_ballots pb WHERE pb.vote_id = v.id AND pb.voter_id = p.id)
+            ) AS pending_votes
      FROM sessions s
      JOIN profiles p ON p.id = s.profile_id
      LEFT JOIN LATERAL (
@@ -87,12 +94,48 @@ export type DashboardVote = {
   eligible: number;
   kind: string;
   poll_summary: string | null;
+  my_status: MyVoteStatus;
+  my_choice: string | null;
 };
 
-export async function fetchDashboard(): Promise<{
+// 'to_vote' / 'voted' only for members on the frozen electorate; null otherwise.
+export type MyVoteStatus = "to_vote" | "voted" | "missed" | null;
+
+// SQL columns for the current member ($1) on vote alias v.
+export const MY_VOTE_SQL = `
+  CASE
+    WHEN NOT EXISTS (SELECT 1 FROM vote_electorate me WHERE me.vote_id = v.id AND me.profile_id = $1::uuid) THEN NULL
+    WHEN EXISTS (SELECT 1 FROM ballots mb WHERE mb.vote_id = v.id AND mb.voter_id = $1::uuid)
+      OR EXISTS (SELECT 1 FROM poll_ballots mpb WHERE mpb.vote_id = v.id AND mpb.voter_id = $1::uuid) THEN 'voted'
+    WHEN v.status = 'open' AND v.deadline > now() THEN 'to_vote'
+    ELSE 'missed'
+  END AS my_status,
+  COALESCE(
+    (SELECT CASE mb.choice WHEN 'for' THEN 'For' WHEN 'against' THEN 'Against' WHEN 'abstain' THEN 'Abstain' ELSE mb.choice END
+     FROM ballots mb WHERE mb.vote_id = v.id AND mb.voter_id = $1::uuid),
+    (SELECT string_agg(o.label, ', ' ORDER BY o.position)
+     FROM poll_answers ma JOIN vote_options o ON o.id = ma.option_id
+     WHERE ma.vote_id = v.id AND ma.voter_id = $1::uuid)
+  ) AS my_choice`;
+
+// Lateral x.to_vote for the current member ($1::uuid) on vote alias v.
+export const TO_VOTE_LATERAL = `
+  CROSS JOIN LATERAL (
+    SELECT EXISTS (SELECT 1 FROM vote_electorate xe WHERE xe.vote_id = v.id AND xe.profile_id = $1::uuid)
+      AND v.status = 'open' AND v.deadline > now()
+      AND NOT EXISTS (SELECT 1 FROM ballots xb WHERE xb.vote_id = v.id AND xb.voter_id = $1::uuid)
+      AND NOT EXISTS (SELECT 1 FROM poll_ballots xpb WHERE xpb.vote_id = v.id AND xpb.voter_id = $1::uuid)
+      AS to_vote
+  ) x`;
+
+// Open votes the member still has to cast first, then other open votes, then closed.
+export const VOTE_ORDER_SQL = `(v.status = 'open') DESC, x.to_vote DESC, v.opened_at DESC`;
+
+export async function fetchDashboard(userId: string, voteLimit: number): Promise<{
   register: DashboardDoc[];
   questions: DashboardQuestion[];
   votes: DashboardVote[];
+  totalVotes: number;
   minutes: number;
   resolutions: number;
 }> {
@@ -100,6 +143,7 @@ export async function fetchDashboard(): Promise<{
     register: DashboardDoc[] | null;
     questions: DashboardQuestion[] | null;
     votes: DashboardVote[] | null;
+    total_votes: number;
     minutes: number;
     resolutions: number;
   }>(
@@ -141,8 +185,9 @@ export async function fetchDashboard(): Promise<{
                   'opened_at', v.opened_at, 'outcome', v.outcome, 'for_count', v.for_count,
                   'against_count', v.against_count, 'abstain_count', v.abstain_count,
                   'author', v.author, 'ballots', v.ballots, 'eligible', v.eligible,
-                  'kind', v.kind, 'poll_summary', v.poll_summary
-                ) ORDER BY (v.status = 'open') DESC, v.opened_at DESC)
+                  'kind', v.kind, 'poll_summary', v.poll_summary,
+                  'my_status', v.my_status, 'my_choice', v.my_choice
+                ) ORDER BY v.ord)
          FROM (
            SELECT v.id, v.subject, v.status, v.deadline, v.opened_at, v.outcome,
                   v.for_count, v.against_count, v.abstain_count, COALESCE(p.display_name, 'Former member') AS author, v.kind,
@@ -156,19 +201,25 @@ export async function fetchDashboard(): Promise<{
                     )
                     FROM vote_options o
                     WHERE o.vote_id = v.id
-                  ) AS poll_summary
+                  ) AS poll_summary,
+                  ${MY_VOTE_SQL},
+                  row_number() OVER (ORDER BY ${VOTE_ORDER_SQL}) AS ord
            FROM votes v
            LEFT JOIN profiles p ON p.id = v.opened_by
-           ORDER BY (v.status = 'open') DESC, v.opened_at DESC
-           LIMIT 6
+           ${TO_VOTE_LATERAL}
+           ORDER BY ord
+           LIMIT $2::int
          ) v
-       ), '[]'::json) AS votes`,
+       ), '[]'::json) AS votes,
+       (SELECT count(*)::int FROM votes) AS total_votes`,
+    [userId, voteLimit],
   );
   const row = rows[0];
   return {
     register: row?.register ?? [],
     questions: row?.questions ?? [],
     votes: row?.votes ?? [],
+    totalVotes: row?.total_votes ?? 0,
     minutes: row?.minutes ?? 0,
     resolutions: row?.resolutions ?? 0,
   };

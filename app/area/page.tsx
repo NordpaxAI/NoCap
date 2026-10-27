@@ -1,16 +1,29 @@
 import Link from "next/link";
 import { DocIcon } from "@/components/members-shell";
-import { requireUser } from "@/lib/auth";
+import { loadAreaFrame, requireUser } from "@/lib/auth";
 import { fetchDashboard } from "@/lib/area-data";
 import { formatShort, questionStatus } from "@/lib/time";
 import { closedVoteLine } from "@/lib/poll";
+import { VoteBadge } from "@/components/vote-badge";
 
-export default async function DashboardPage() {
+const VOTE_PAGE = 6;
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ votes?: string }> }) {
   const user = await requireUser();
-  const data = await fetchDashboard();
+  const asked = Number.parseInt((await searchParams).votes || "", 10);
+  const voteLimit = Number.isFinite(asked) && asked > VOTE_PAGE ? Math.min(asked, 500) : VOTE_PAGE;
+  const data = await fetchDashboard(user.id, voteLimit);
+  const toVote = (await loadAreaFrame())?.pendingVotes ?? 0;
 
   return (
     <>
+      {toVote > 0 ? (
+        <p className="note" style={{ marginBottom: 18 }}>
+          <Link href="/area/votes?filter=to_vote">
+            You have {toVote} open vote{toVote === 1 ? "" : "s"} to cast.
+          </Link>
+        </p>
+      ) : null}
       <div className="head">
         <div className="eyebrow">Documents</div>
         <Link className="act" href="/area/documents">Open the library</Link>
@@ -35,7 +48,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="head">
+      <div className="head" id="votes">
         <div className="eyebrow">Votes</div>
         {user.role === "admin" ? <Link className="act" href="/area/votes/new">Open a vote</Link> : <Link className="act" href="/area/votes">All votes</Link>}
       </div>
@@ -49,6 +62,7 @@ export default async function DashboardPage() {
                 <span className="tag">Poll</span>
               </>
             ) : null}
+            <VoteBadge status={vote.my_status} choice={vote.my_choice} />
           </div>
           <Link className="title" href={`/area/votes/${vote.id}`}>{vote.subject}</Link>
           {vote.status === "open" ? (
@@ -61,6 +75,13 @@ export default async function DashboardPage() {
           ) : null}
         </article>
       ))}
+      {data.totalVotes > data.votes.length ? (
+        <p style={{ marginTop: 12 }}>
+          <Link className="act" href={`/area?votes=${voteLimit + VOTE_PAGE}#votes`} scroll={false}>
+            Load more votes ({data.totalVotes - data.votes.length} more)
+          </Link>
+        </p>
+      ) : null}
 
       <div className="head" style={{ marginTop: 36 }}>
         <div className="eyebrow">Questions</div>

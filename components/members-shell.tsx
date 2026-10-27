@@ -18,15 +18,20 @@ export function MembersShell({
   notifications,
   unread,
   hasArticle = false,
+  pendingVotes = 0,
   children,
 }: {
   user: Member;
   notifications: BellItem[];
   unread: number;
   hasArticle?: boolean;
+  pendingVotes?: number;
   children: React.ReactNode;
 }) {
-  const base = hasArticle ? [...LINKS, { href: "/area/article", label: "Your article" }] : LINKS;
+  const counted = LINKS.map((link) =>
+    link.href === "/area/votes" && pendingVotes > 0 ? { ...link, label: `Votes (${pendingVotes})` } : link,
+  );
+  const base = hasArticle ? [...counted, { href: "/area/article", label: "Your article" }] : counted;
   const links =
     user.role === "admin"
       ? [...base, { href: "/area/admin", label: "Admin" }, { href: "/area/admin/articles", label: "Articles" }, { href: "/area/admin/messages", label: "Messages" }, { href: "/area/admin/outbox", label: "Outbox" }]

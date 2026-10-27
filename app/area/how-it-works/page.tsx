@@ -24,7 +24,7 @@ export default function HowItWorksPage() {
         The constitutive quorum is the minimum share of eligible voters who must take part. Abstentions count as participation. If fewer people vote than that share requires, the vote does not pass because the constitutive quorum (minimum participation) was not reached.
       </p>
       <p className="help">
-        The deliberative quorum is the minimum share of votes cast that must be in favour. Abstentions are part of that count. If enough people voted, but the share in favour is too low, the vote does not pass because the majority was not reached. The page and the PDF record state which of the two it was.
+        The deliberative quorum (majority) is the minimum share of For among For and Against votes. Abstentions are not part of that count; they count for the constitutive quorum only. If enough people voted, but the share in favour is too low, the vote does not pass because the majority was not reached. The page and the PDF record state which of the two it was.
       </p>
       <p className="help">
         A poll is the other kind of vote. The admin writes between 2 and 10 options. Each voter picks one, unless the admin allows more than one. There is no abstain option. A member who does not answer has not voted, and still counts as outstanding for reminders. The constitutive quorum still applies. The deliberative quorum does not. The result is the count for each option, and that count as a share of the people who voted. If two or more options share the highest count, the record says it is a tie. If the constitutive quorum is not reached, the record says so. A poll is not entered in the resolutions register. Its record is the vote page and the PDF.

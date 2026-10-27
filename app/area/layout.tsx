@@ -22,6 +22,7 @@ export default async function AreaLayout({ children }: { children: React.ReactNo
         unread={frame.unread}
         notifications={frame.notifications}
         hasArticle={frame.hasArticle}
+        pendingVotes={frame.pendingVotes}
       >
         {children}
       </MembersShell>

@@ -116,6 +116,7 @@ export async function loadVoteRecord(voteId: string): Promise<VoteRecord | null>
      ORDER BY o.position`,
     [voteId],
   );
+  const excluded = await loadExclusions(voteId);
   return {
     subject: vote.subject,
     description: vote.description,
@@ -141,7 +142,18 @@ export async function loadVoteRecord(voteId: string): Promise<VoteRecord | null>
       choice: voter.choice,
       castAt: voter.cast_at,
     })),
+    excluded,
   };
+}
+
+export async function loadExclusions(voteId: string): Promise<{ name: string; email: string }[]> {
+  const { rows } = await pool.query<{ name: string; email: string }>(
+    `SELECT COALESCE(p.display_name, 'Former member') AS name, p.email
+     FROM vote_exclusions x JOIN profiles p ON p.id = x.profile_id
+     WHERE x.vote_id = $1 ORDER BY p.display_name`,
+    [voteId],
+  );
+  return rows;
 }
 
 export function recordKey(voteId: string): string {

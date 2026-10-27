@@ -605,6 +605,9 @@ export async function openVote(formData: FormData) {
   const poll = kind === "poll";
   const options = formData.getAll("option_label").map((value) => String(value).trim());
   const allowMultiple = formData.get("allow_multiple") === "on";
+  const excluded = [...new Set(formData.getAll("exclude").map((value) => String(value)))].filter((value) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
+  );
   if (kind !== "standard" && kind !== "poll") go("/area/votes/new", "Choose a standard vote or a poll.");
   if (!subject || !description || !deadlineRaw) go("/area/votes/new", "Subject, description and deadline are required.");
   if (!Number.isFinite(qc) || qc < 0 || qc > 100) {
@@ -640,20 +643,23 @@ export async function openVote(formData: FormData) {
         poll ? null : qd,
         poll ? options : [],
         allowMultiple,
+        [...excluded].sort(),
       ]),
       async (client) => {
-        if (poll) {
-          const { rows } = await client.query<{ id: string }>(
-            `SELECT private.open_poll($1, $2, $3, $4, $5, $6, $7) AS id`,
-            [admin.id, subject, description, deadline, qc, allowMultiple, options],
-          );
-          return rows[0].id;
+        const { rows } = poll
+          ? await client.query<{ id: string }>(
+              `SELECT private.open_poll($1, $2, $3, $4, $5, $6, $7) AS id`,
+              [admin.id, subject, description, deadline, qc, allowMultiple, options],
+            )
+          : await client.query<{ id: string }>(
+              `SELECT private.open_vote($1, $2, $3, $4, $5, $6) AS id`,
+              [admin.id, subject, description, deadline, qc, qd],
+            );
+        const id = rows[0].id;
+        if (excluded.length > 0) {
+          await client.query(`SELECT private.exclude_from_new_vote($1, $2, $3::uuid[])`, [admin.id, id, excluded]);
         }
-        const { rows } = await client.query<{ id: string }>(
-          `SELECT private.open_vote($1, $2, $3, $4, $5, $6) AS id`,
-          [admin.id, subject, description, deadline, qc, qd],
-        );
-        return rows[0].id;
+        return id;
       },
     );
     voteId = outcome.id;
@@ -672,7 +678,7 @@ export async function openVote(formData: FormData) {
           `Options: ${options.join("; ")}.\n` +
           (allowMultiple ? `More than one option may be chosen.\n` : `Each voter chooses one option.\n`)
         : `Constitutive quorum: ${qc}% of eligible voters (abstentions count as participation).\n` +
-          `Deliberative quorum: ${qd}% of votes cast in favour.\n`;
+          `Majority (deliberative quorum): ${qd}% For, calculated on For and Against only. Abstentions count for the constitutive quorum only.\n`;
       await notifyMany(
         people.map((person) => ({
           recipientId: person.id,

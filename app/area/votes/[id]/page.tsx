@@ -9,6 +9,7 @@ import { pool } from "@/lib/db";
 import { labelChoice, outcomeLabel } from "@/lib/pdf";
 import { formatPollCounts, joinLabels, leadingTie } from "@/lib/poll";
 import { formatWhen } from "@/lib/time";
+import { loadExclusions } from "@/lib/votes";
 
 type OptionRow = { id: string; label: string; count: number };
 type ChoiceRow = { option_id: string; label: string };
@@ -108,6 +109,7 @@ export default async function VotePage({
   );
   const vote = rows[0];
   if (!vote) notFound();
+  const excluded = await loadExclusions(vote.id);
   const poll = vote.kind === "poll";
   const roll = vote.roll ?? [];
   const options = vote.options ?? [];
@@ -143,8 +145,13 @@ export default async function VotePage({
           Constitutive quorum {vote.quorum_constitutive}%
           {poll
             ? " · the deliberative quorum does not apply"
-            : ` · deliberative quorum ${vote.quorum_deliberative}%`}
+            : ` · majority ${vote.quorum_deliberative}% For, calculated on For and Against only (abstentions count for the constitutive quorum only)`}
         </p>
+        {excluded.length ? (
+          <p className="by">
+            Excluded from this vote by the admin (not eligible, not counted for the quorum): {excluded.map((person) => person.name).join(", ")}.
+          </p>
+        ) : null}
         {poll ? (
           <p className="by">
             {vote.allow_multiple ? "A voter may pick more than one option." : "Each voter picks one option."}
@@ -188,7 +195,7 @@ export default async function VotePage({
           </ActionForm>
         ) : null}
         {mine && answered(mine) ? (
-          <p className="cast">Recorded: {choiceText(mine)} · {mine.cast_at ? formatWhen(mine.cast_at) : ""}</p>
+          <p className="cast">You voted: {choiceText(mine)} · {mine.cast_at ? formatWhen(mine.cast_at) : ""}</p>
         ) : null}
         {open && !mine ? <p className="by">You are not on the frozen list of eligible voters.</p> : null}
         {error ? <p className="error">{error}</p> : null}
@@ -229,7 +236,7 @@ export default async function VotePage({
               Constitutive quorum {vote.constitutive_met ? "met" : "not met"} ({vote.voted_count} of {vote.eligible_count} voted).
               {poll
                 ? " The deliberative quorum does not apply to a poll."
-                : ` Deliberative quorum ${vote.deliberative_met ? "met" : "not met"}.`}
+                : ` Majority (For and Against only) ${vote.deliberative_met ? "met" : "not met"}.`}
             </p>
             {poll && vote.allow_multiple ? (
               <p className="by">Shares are of the people who voted. Someone who picks more than one option is counted in each option.</p>

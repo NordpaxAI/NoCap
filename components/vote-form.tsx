@@ -6,12 +6,12 @@ import { SubmitButton } from "@/components/submit-button";
 import { openVote } from "@/lib/actions";
 
 const STANDARD_HELP =
-  "The list of eligible voters freezes when you open the vote. A vote must stay open for longer than 48 hours, so a reminder can go out 48 hours before the deadline and again 24 hours before. Set both quorums now. The constitutive quorum is the share of eligible voters who must vote for the result to be valid. Abstentions count as participation. Example: 11 members and 50% means at least 6 must vote. The deliberative quorum is the share of For among votes cast. Example: 80% means 70% in favour does not pass. If the vote does not pass, the record states whether the constitutive quorum or the majority was not reached.";
+  "The list of eligible voters freezes when you open the vote. A vote must stay open for longer than 48 hours, so a reminder can go out 48 hours before the deadline and again 24 hours before. Set both quorums now. The constitutive quorum is the share of eligible voters who must vote for the result to be valid. Abstentions count as participation. Example: 11 members and 50% means at least 6 must vote. The deliberative quorum (majority) is the share of For among For and Against only; abstentions count for the constitutive quorum only. Example: 80% means 70% in favour does not pass. Decimals are allowed: two thirds = 66.67. If the vote does not pass, the record states whether the constitutive quorum or the majority was not reached.";
 
 const POLL_HELP =
   "The list of eligible voters freezes when you open the poll. It must stay open for longer than 48 hours, so a reminder can go out 48 hours before the deadline and again 24 hours before. Add 2 to 10 options. Each voter picks one, unless you allow multiple answers. There is no abstain choice: a member who does not answer has not voted. The constitutive quorum is the share of eligible voters who must vote for the result to count. Example: 11 members and 50% means at least 6 must answer. The deliberative quorum does not apply to a poll. The result is the number of ballots for each option, and that number as a share of the people who voted. If two or more options share the highest count, the record shows a tie. If fewer people vote than the constitutive quorum requires, the record says the constitutive quorum was not reached. Choices are public and cannot be changed once cast.";
 
-export function VoteForm({ earliest }: { earliest: string }) {
+export function VoteForm({ earliest, members }: { earliest: string; members: { id: string; name: string }[] }) {
   const [kind, setKind] = useState<"standard" | "poll">("standard");
   const [options, setOptions] = useState(["", ""]);
   const [multiple, setMultiple] = useState(false);
@@ -74,12 +74,14 @@ export function VoteForm({ earliest }: { earliest: string }) {
       </div>
       <div>
         <label className="lbl" htmlFor="quorum_constitutive">Constitutive quorum (%)</label>
-        <input id="quorum_constitutive" name="quorum_constitutive" type="number" min="0" max="100" step="1" required defaultValue={50} />
+        <input id="quorum_constitutive" name="quorum_constitutive" type="number" min="0" max="100" step="0.01" required defaultValue={50} />
+        <p className="help">Decimals allowed, e.g. two thirds = 66.67.</p>
       </div>
       {poll ? null : (
         <div id="deliberative-field">
           <label className="lbl" htmlFor="quorum_deliberative">Deliberative quorum (%)</label>
-          <input id="quorum_deliberative" name="quorum_deliberative" type="number" min="0" max="100" step="1" required defaultValue={50} />
+          <input id="quorum_deliberative" name="quorum_deliberative" type="number" min="0" max="100" step="0.01" required defaultValue={50} />
+          <p className="help">Calculated on For and Against only. Decimals allowed, e.g. two thirds = 66.67.</p>
         </div>
       )}
       {poll ? (
@@ -129,6 +131,18 @@ export function VoteForm({ earliest }: { earliest: string }) {
             <span>Allow multiple answers</span>
           </label>
         </div>
+      ) : null}
+      {members.length ? (
+        <fieldset className="plain">
+          <legend className="lbl">Exclude members (optional)</legend>
+          <p className="help">Excluded members are left out of the frozen list of eligible voters: they cannot vote and do not count for the quorum. This is shown on the vote page and in the record.</p>
+          {members.map((member) => (
+            <label className="choice-line" key={member.id}>
+              <input type="checkbox" name="exclude" value={member.id} />
+              <span>{member.name}</span>
+            </label>
+          ))}
+        </fieldset>
       ) : null}
       <div>
         <label className="lbl" htmlFor="attachments">Attachments</label>

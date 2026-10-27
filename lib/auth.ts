@@ -55,6 +55,7 @@ export type AreaFrame = {
   unread: number;
   needsMaintenance: boolean;
   hasArticle: boolean;
+  pendingVotes: number;
 };
 
 function memberFromRow(row: AreaFrameRow): Member {
@@ -94,6 +95,7 @@ export const loadAreaFrame = cache(async (): Promise<AreaFrame | null> => {
     unread: notes.filter((note) => !note.read_at).length,
     needsMaintenance: row.needs_maintenance,
     hasArticle: row.has_article,
+    pendingVotes: row.pending_votes ?? 0,
   };
 });
 
