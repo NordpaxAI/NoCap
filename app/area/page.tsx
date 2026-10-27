@@ -8,11 +8,31 @@ import { VoteBadge } from "@/components/vote-badge";
 
 const VOTE_PAGE = 6;
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ votes?: string }> }) {
+type SectionKey = "t" | "v" | "o";
+
+function limitOf(raw: string | undefined): number {
+  const asked = Number.parseInt(raw || "", 10);
+  return Number.isFinite(asked) && asked > VOTE_PAGE ? Math.min(asked, 500) : VOTE_PAGE;
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ t?: string; v?: string; o?: string }> }) {
   const user = await requireUser();
-  const asked = Number.parseInt((await searchParams).votes || "", 10);
-  const voteLimit = Number.isFinite(asked) && asked > VOTE_PAGE ? Math.min(asked, 500) : VOTE_PAGE;
-  const data = await fetchDashboard(user.id, voteLimit);
+  const params = await searchParams;
+  const limits: Record<SectionKey, number> = { t: limitOf(params.t), v: limitOf(params.v), o: limitOf(params.o) };
+  const data = await fetchDashboard(user.id, 500);
+  const sections = [
+    { key: "t" as const, title: "To vote", empty: "Nothing to vote on right now.", items: data.votes.filter((vote) => vote.my_status === "to_vote") },
+    { key: "v" as const, title: "Voted", empty: "", items: data.votes.filter((vote) => vote.my_status === "voted") },
+    { key: "o" as const, title: "Closed and other votes", empty: "", items: data.votes.filter((vote) => vote.my_status !== "to_vote" && vote.my_status !== "voted") },
+  ].map((section) => ({ ...section, limit: limits[section.key] }));
+  const moreHref = (key: SectionKey) => {
+    const next = { ...limits, [key]: limits[key] + VOTE_PAGE };
+    const query = (Object.keys(next) as SectionKey[])
+      .filter((k) => next[k] > VOTE_PAGE)
+      .map((k) => `${k}=${next[k]}`)
+      .join("&");
+    return `/area?${query}#votes-${key}`;
+  };
   const toVote = (await loadAreaFrame())?.pendingVotes ?? 0;
 
   return (
@@ -52,36 +72,46 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="eyebrow">Votes</div>
         {user.role === "admin" ? <Link className="act" href="/area/votes/new">Open a vote</Link> : <Link className="act" href="/area/votes">All votes</Link>}
       </div>
-      {data.votes.map((vote) => (
-        <article className={vote.status === "open" ? "thread open" : "thread"} key={vote.id}>
-          <div className="tags">
-            <span className={vote.status === "open" ? "tag now" : "tag"}>{vote.status === "open" ? "Vote open" : "Closed"}</span>
-            {vote.kind === "poll" ? (
-              <>
-                <span className="dot" />
-                <span className="tag">Poll</span>
-              </>
+      {sections.map((section) => {
+        const shown = section.items.slice(0, section.limit);
+        if (section.items.length === 0 && section.key !== "t") return null;
+        return (
+          <section key={section.key} id={`votes-${section.key}`} style={{ marginBottom: 18 }}>
+            <div className="eyebrow" style={{ margin: "10px 0 6px" }}>{section.title} ({section.items.length})</div>
+            {section.items.length === 0 ? <p className="muted">{section.empty}</p> : null}
+            {shown.map((vote) => (
+              <article className={vote.status === "open" ? "thread open" : "thread"} key={vote.id}>
+                <div className="tags">
+                  <span className={vote.status === "open" ? "tag now" : "tag"}>{vote.status === "open" ? "Vote open" : "Closed"}</span>
+                  {vote.kind === "poll" ? (
+                    <>
+                      <span className="dot" />
+                      <span className="tag">Poll</span>
+                    </>
+                  ) : null}
+                  <VoteBadge status={vote.my_status} choice={vote.my_choice} />
+                </div>
+                <Link className="title" href={`/area/votes/${vote.id}`}>{vote.subject}</Link>
+                {vote.status === "open" ? (
+                  <div className="by">{vote.ballots} of {vote.eligible} voted · closes {formatShort(vote.deadline)}</div>
+                ) : (
+                  <div className="by">{vote.author} · {formatShort(vote.opened_at)}</div>
+                )}
+                {vote.status === "closed" && vote.outcome ? (
+                  <div className="result">{closedVoteLine(vote)}</div>
+                ) : null}
+              </article>
+            ))}
+            {section.items.length > shown.length ? (
+              <p style={{ marginTop: 12 }}>
+                <Link className="act" href={moreHref(section.key)} scroll={false}>
+                  Load more ({section.items.length - shown.length} more)
+                </Link>
+              </p>
             ) : null}
-            <VoteBadge status={vote.my_status} choice={vote.my_choice} />
-          </div>
-          <Link className="title" href={`/area/votes/${vote.id}`}>{vote.subject}</Link>
-          {vote.status === "open" ? (
-            <div className="by">{vote.ballots} of {vote.eligible} voted · closes {formatShort(vote.deadline)}</div>
-          ) : (
-            <div className="by">{vote.author} · {formatShort(vote.opened_at)}</div>
-          )}
-          {vote.status === "closed" && vote.outcome ? (
-            <div className="result">{closedVoteLine(vote)}</div>
-          ) : null}
-        </article>
-      ))}
-      {data.totalVotes > data.votes.length ? (
-        <p style={{ marginTop: 12 }}>
-          <Link className="act" href={`/area?votes=${voteLimit + VOTE_PAGE}#votes`} scroll={false}>
-            Load more votes ({data.totalVotes - data.votes.length} more)
-          </Link>
-        </p>
-      ) : null}
+          </section>
+        );
+      })}
 
       <div className="head" style={{ marginTop: 36 }}>
         <div className="eyebrow">Questions</div>
