@@ -96,6 +96,11 @@ export type DashboardVote = {
   poll_summary: string | null;
   my_status: MyVoteStatus;
   my_choice: string | null;
+  live_for: number;
+  live_against: number;
+  live_abstain: number;
+  quorum_constitutive: number;
+  quorum_deliberative: number;
 };
 
 // 'to_vote' / 'voted' only for members on the frozen electorate; null otherwise.
@@ -186,7 +191,9 @@ export async function fetchDashboard(userId: string, voteLimit: number): Promise
                   'against_count', v.against_count, 'abstain_count', v.abstain_count,
                   'author', v.author, 'ballots', v.ballots, 'eligible', v.eligible,
                   'kind', v.kind, 'poll_summary', v.poll_summary,
-                  'my_status', v.my_status, 'my_choice', v.my_choice
+                  'my_status', v.my_status, 'my_choice', v.my_choice,
+                  'live_for', v.live_for, 'live_against', v.live_against, 'live_abstain', v.live_abstain,
+                  'quorum_constitutive', v.quorum_constitutive, 'quorum_deliberative', v.quorum_deliberative
                 ) ORDER BY v.ord)
          FROM (
            SELECT v.id, v.subject, v.status, v.deadline, v.opened_at, v.outcome,
@@ -194,6 +201,10 @@ export async function fetchDashboard(userId: string, voteLimit: number): Promise
                   (SELECT count(*)::int FROM ballots b WHERE b.vote_id = v.id)
                     + (SELECT count(*)::int FROM poll_ballots pb WHERE pb.vote_id = v.id) AS ballots,
                   (SELECT count(*)::int FROM vote_electorate e WHERE e.vote_id = v.id) AS eligible,
+                  (SELECT count(*)::int FROM ballots b WHERE b.vote_id = v.id AND b.choice = 'for') AS live_for,
+                  (SELECT count(*)::int FROM ballots b WHERE b.vote_id = v.id AND b.choice = 'against') AS live_against,
+                  (SELECT count(*)::int FROM ballots b WHERE b.vote_id = v.id AND b.choice = 'abstain') AS live_abstain,
+                  v.quorum_constitutive, v.quorum_deliberative,
                   (
                     SELECT string_agg(
                       o.label || ' ' || (SELECT count(*)::int FROM poll_answers a WHERE a.option_id = o.id)::text,

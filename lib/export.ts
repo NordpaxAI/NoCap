@@ -110,11 +110,13 @@ export async function buildFullExport(): Promise<Buffer> {
 }
 
 export function downloadResponse(body: Buffer, filename: string, mime: string): Response {
+  const safe = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "") || "file";
   return new Response(new Uint8Array(body), {
     headers: {
       "Content-Type": mime,
-      "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
+      "Content-Disposition": `attachment; filename="${safe}"`,
       "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

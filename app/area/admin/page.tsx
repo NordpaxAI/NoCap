@@ -124,6 +124,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <p style={{ marginTop: 22 }}><a href="/area/publications/new">Add a publication</a></p>
       <p><a href="/area/applications">Applications</a></p>
       <p><a href="/area/admin/messages">Contact messages</a></p>
+      <p><a href="/area/admin/profiles">Public profiles (Members page)</a></p>
       <p><a href="/area/admin/outbox">Email outbox</a></p>
     </>
   );

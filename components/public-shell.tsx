@@ -32,7 +32,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           <div className="foot-top">
             <div>
               <img className="foot-mark" src="/brand/mark-cream.png" alt="nocap" />
-              <div className="foot-tag">NextGen European Deal Lawyers</div>
+              <div className="foot-tag">NextGen International Deal Lawyers</div>
             </div>
             <div className="foot-links">
               <Link href="/about">About</Link>

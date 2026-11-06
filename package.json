@@ -15,6 +15,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:deploy": "tsx scripts/deploy-db.ts",
     "test:seed-guard": "tsx scripts/test-seed-guard.ts",
+    "test:vote-documents": "tsx scripts/test-vote-documents.ts",
     "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {

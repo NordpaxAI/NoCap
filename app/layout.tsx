@@ -10,8 +10,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", weight: ["40
 const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: { default: "nocap — NextGen European Deal Lawyers", template: "%s — nocap" },
-  description: "A private European circle for the next generation of deal lawyers.",
+  title: { default: "nocap — NextGen International Deal Lawyers", template: "%s — nocap" },
+  description: "A private international circle for the next generation of deal lawyers.",
 };
 
 export const viewport: Viewport = {

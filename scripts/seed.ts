@@ -178,6 +178,7 @@ async function writeSeed(client: PoolClient, reset: boolean): Promise<void> {
 
   await client.query(`
     TRUNCATE
+      upload_sessions, member_public_profiles,
       resolutions, ballots, vote_electorate, votes,
       attachments, question_comments, questions,
       document_versions, documents,

@@ -119,37 +119,20 @@ export function ProfileForm({
         <input id="display_name" name="display_name" defaultValue={defaults.display_name} required />
       </div>
       <div>
-        <label className="lbl" htmlFor="public_role">Role</label>
-        <input id="public_role" name="public_role" defaultValue={defaults.public_role} placeholder="Senior associate · M&A" />
-      </div>
-      <div>
-        <label className="lbl" htmlFor="bio">Short biography</label>
-        <textarea id="bio" name="bio" defaultValue={defaults.bio} />
+        <label className="lbl" htmlFor="bio">Bio</label>
+        <textarea id="bio" name="bio" defaultValue={defaults.bio} rows={6} />
       </div>
       <div>
         <label className="lbl" htmlFor="city">City</label>
         <input id="city" name="city" defaultValue={defaults.city} />
       </div>
       <div>
-        <label className="lbl" htmlFor="jurisdiction">Jurisdiction</label>
+        <label className="lbl" htmlFor="jurisdiction">Country</label>
         <input id="jurisdiction" name="jurisdiction" defaultValue={defaults.jurisdiction} />
-      </div>
-      <div>
-        <label className="lbl" htmlFor="firm">Firm</label>
-        <input id="firm" name="firm" defaultValue={defaults.firm} />
-      </div>
-      <div>
-        <label className="lbl" htmlFor="practice_area">Practice area</label>
-        <input id="practice_area" name="practice_area" defaultValue={defaults.practice_area} />
-      </div>
-      <div>
-        <label className="lbl" htmlFor="contacts">Contacts</label>
-        <input id="contacts" name="contacts" defaultValue={defaults.contacts} />
       </div>
       <div>
         <label className="lbl" htmlFor="photo">Photo</label>
         <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" />
-        <p className="help">JPEG, PNG or WebP. A large phone photo is reduced before it is saved.</p>
       </div>
       <button className="btn solid" type="submit" disabled={pending} aria-busy={pending}>
         {pending ? (
@@ -158,7 +141,7 @@ export function ProfileForm({
             Loading...
           </>
         ) : (
-          "Save profile"
+          "Save"
         )}
       </button>
     </form>

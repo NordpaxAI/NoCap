@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
 import { openVote } from "@/lib/actions";
+import { uploadVoteDocuments } from "@/lib/upload-vote-documents";
+import { clientFileProblem, quotaProblem, VOTE_DOCUMENT_ACCEPT, VOTE_DOCUMENT_HELP } from "@/lib/vote-documents";
 
 const STANDARD_HELP =
   "The list of eligible voters freezes when you open the vote. A vote must stay open for longer than 48 hours, so a reminder can go out 48 hours before the deadline and again 24 hours before. Set both quorums now. The constitutive quorum is the share of eligible voters who must vote for the result to be valid. Abstentions count as participation. Example: 11 members and 50% means at least 6 must vote. The deliberative quorum (majority) is the share of For among For and Against only; abstentions count for the constitutive quorum only. Example: 80% means 70% in favour does not pass. Decimals are allowed: two thirds = 66.67. If the vote does not pass, the record states whether the constitutive quorum or the majority was not reached.";
@@ -12,9 +15,13 @@ const POLL_HELP =
   "The list of eligible voters freezes when you open the poll. It must stay open for longer than 48 hours, so a reminder can go out 48 hours before the deadline and again 24 hours before. Add 2 to 10 options. Each voter picks one, unless you allow multiple answers. There is no abstain choice: a member who does not answer has not voted. The constitutive quorum is the share of eligible voters who must vote for the result to count. Example: 11 members and 50% means at least 6 must answer. The deliberative quorum does not apply to a poll. The result is the number of ballots for each option, and that number as a share of the people who voted. If two or more options share the highest count, the record shows a tie. If fewer people vote than the constitutive quorum requires, the record says the constitutive quorum was not reached. Choices are public and cannot be changed once cast.";
 
 export function VoteForm({ earliest, members }: { earliest: string; members: { id: string; name: string }[] }) {
+  const router = useRouter();
   const [kind, setKind] = useState<"standard" | "poll">("standard");
   const [options, setOptions] = useState(["", ""]);
   const [multiple, setMultiple] = useState(false);
+  const [chosen, setChosen] = useState<File[]>([]);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const poll = kind === "poll";
 
   function updateOption(index: number, value: string) {
@@ -33,7 +40,52 @@ export function VoteForm({ earliest, members }: { earliest: string; members: { i
   }
 
   return (
-    <ActionForm action={openVote} className="stack">
+    <ActionForm
+      action={openVote}
+      className="stack"
+      intercept={async (formData) => {
+        setDocError(null);
+        setProgress(null);
+        const files = formData
+          .getAll("attachments")
+          .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+        for (const file of files) {
+          const problem = clientFileProblem(file);
+          if (problem) {
+            setDocError(problem);
+            return;
+          }
+        }
+        const quota = quotaProblem(0, 0, files.map((file) => file.size));
+        if (quota) {
+          setDocError(quota);
+          return;
+        }
+        formData.delete("attachments");
+        formData.set("defer_attachments", "1");
+        const result = await openVote(formData);
+        if (!result) return;
+        if ("error" in result) {
+          setDocError(result.error);
+          return;
+        }
+        if (result.duplicate) {
+          const note = files.length ? "This vote was already opened. Add any missing documents below." : "";
+          router.push(note ? `/area/votes/${result.id}?error=${encodeURIComponent(note)}` : `/area/votes/${result.id}`);
+          return;
+        }
+        if (files.length) {
+          try {
+            await uploadVoteDocuments(result.id, files, setProgress);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "The document could not be added.";
+            router.push(`/area/votes/${result.id}?error=${encodeURIComponent(message)}`);
+            return;
+          }
+        }
+        router.push(`/area/votes/${result.id}`);
+      }}
+    >
       <fieldset className="plain">
         <legend className="lbl">Vote type</legend>
         <label className="choice-line">
@@ -145,8 +197,22 @@ export function VoteForm({ earliest, members }: { earliest: string; members: { i
         </fieldset>
       ) : null}
       <div>
-        <label className="lbl" htmlFor="attachments">Attachments</label>
-        <input id="attachments" name="attachments" type="file" multiple />
+        <label className="lbl" htmlFor="attachments">Documents</label>
+        <input
+          id="attachments"
+          name="attachments"
+          type="file"
+          multiple
+          accept={VOTE_DOCUMENT_ACCEPT}
+          data-external-upload="true"
+          onChange={(event) => setChosen(Array.from(event.target.files || []))}
+        />
+        <p className="help">{VOTE_DOCUMENT_HELP}</p>
+        {chosen.length ? (
+          <p className="by">{chosen.map((file) => file.name).join(", ")}</p>
+        ) : null}
+        {progress ? <p className="by" role="status">{progress}</p> : null}
+        {docError ? <p className="error" role="alert">{docError}</p> : null}
       </div>
       <SubmitButton id="open-vote" className="btn solid">Open the vote</SubmitButton>
     </ActionForm>
