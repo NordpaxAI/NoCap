@@ -1,4 +1,5 @@
--- 014: let a vote hold several documents, including files larger than one request.
+-- 016: let a vote hold several documents, including files larger than one request.
+-- 014 is member public profiles and is already applied in production. 015 is unused.
 -- Additive. No existing row, vote, option or attachment is updated or deleted.
 -- Existing attachment rows keep a null upload token.
 -- upload_sessions is unfinished upload state only. It is not a vote document.

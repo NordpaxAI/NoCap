@@ -17,6 +17,22 @@ export async function migrate(): Promise<void> {
   `);
   const dir = path.join(process.cwd(), "db", "migrations");
   const files = readdirSync(dir).filter((file) => file.endsWith(".sql")).sort();
+  // The ledger id is the full filename. Production already applied
+  // 014_member_public_profiles.sql. A second file numbered 014 would be a
+  // different id and would run on the next deploy. Refuse duplicate numbers.
+  const seen = new Map<string, string>();
+  for (const file of files) {
+    const number = /^(\d+)/.exec(file)?.[1];
+    if (!number) continue;
+    const other = seen.get(number);
+    if (other) {
+      throw new Error(
+        `Two migrations share version ${number}: ${other} and ${file}. ` +
+          "Already applied 014_member_public_profiles.sql must stay 014. New work needs the next free number.",
+      );
+    }
+    seen.set(number, file);
+  }
   for (const file of files) {
     const { rows } = await pool.query(`SELECT 1 FROM schema_migrations WHERE id = $1`, [file]);
     if (rows.length) {

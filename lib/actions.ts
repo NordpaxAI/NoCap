@@ -151,13 +151,13 @@ export async function updateProfile(formData: FormData) {
     await pool.query(
       `UPDATE profiles SET
          display_name = $2,
-         firm = $3,
-         city = $4,
-         practice_area = $5,
-         contacts = $6,
-         public_role = $7,
-         bio = $8,
-         jurisdiction = $9,
+         firm = CASE WHEN $11::text[] @> ARRAY['firm'] THEN $3 ELSE firm END,
+         city = CASE WHEN $11::text[] @> ARRAY['city'] THEN $4 ELSE city END,
+         practice_area = CASE WHEN $11::text[] @> ARRAY['practice_area'] THEN $5 ELSE practice_area END,
+         contacts = CASE WHEN $11::text[] @> ARRAY['contacts'] THEN $6 ELSE contacts END,
+         public_role = CASE WHEN $11::text[] @> ARRAY['public_role'] THEN $7 ELSE public_role END,
+         bio = CASE WHEN $11::text[] @> ARRAY['bio'] THEN $8 ELSE bio END,
+         jurisdiction = CASE WHEN $11::text[] @> ARRAY['jurisdiction'] THEN $9 ELSE jurisdiction END,
          photo_key = $10,
          updated_at = now()
        WHERE id = $1`,
@@ -172,6 +172,7 @@ export async function updateProfile(formData: FormData) {
         blank(formData.get("bio")),
         blank(formData.get("jurisdiction")),
         photoKey,
+        ["firm", "city", "practice_area", "contacts", "public_role", "bio", "jurisdiction"].filter((key) => formData.has(key)),
       ],
     );
   } catch (error) {

@@ -34,7 +34,7 @@ export function MembersShell({
   const base = hasArticle ? [...counted, { href: "/area/article", label: "Your article" }] : counted;
   const links =
     user.role === "admin"
-      ? [...base, { href: "/area/admin", label: "Admin" }, { href: "/area/admin/articles", label: "Articles" }, { href: "/area/admin/messages", label: "Messages" }, { href: "/area/admin/outbox", label: "Outbox" }]
+      ? [...base, { href: "/area/admin", label: "Admin" }, { href: "/area/admin/articles", label: "Articles" }, { href: "/area/admin/profiles", label: "Profiles" }, { href: "/area/admin/messages", label: "Messages" }, { href: "/area/admin/outbox", label: "Outbox" }]
       : base;
   return (
     <div className="mem">

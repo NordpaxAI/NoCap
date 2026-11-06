@@ -8,19 +8,19 @@ export default function AboutPage() {
       <div className="eyebrow">About</div>
       <h1 className="pt">A circle, not a network.</h1>
       <p className="about-lede">
-        nocap is a private circle of deal lawyers across Europe. Small on purpose, by invitation, and built by the people in it.
+        nocap is a private circle of deal lawyers from different jurisdictions. Small on purpose, by invitation, and built by the people in it.
       </p>
       <div className="about-list">
         <div className="about-item">
           <h3>What the name means</h3>
           <p>
-            In an SPA, the cap is the ceiling on a party&apos;s liability. No cap: no ceiling. Everywhere else, “no cap” means “for real” - real relationships, not conference-badge networking. Both halves are the point.
+            The name reads two ways. At the deal table, the cap limits a party&apos;s liability under the transaction documents. Everywhere else, “no cap” means “for real”. Put together, that&apos;s us: deal lawyers, straight up.
           </p>
         </div>
         <div className="about-item">
           <h3>Where we come from</h3>
           <p>
-            nocap started with lawyers across Europe who came to know and respect each other, and in time to trust each other. We decided to build something around it.
+            nocap started with lawyers from different jurisdictions who met on deals and off them, and came to trust each other. We decided to build something around it.
           </p>
         </div>
         <div className="about-item">
@@ -32,7 +32,7 @@ export default function AboutPage() {
         <div className="about-item">
           <h3>Why it matters</h3>
           <p>
-            Cross-border practice runs on trust, and trust sits at partner level or in networks too large to mean anything. We are an association of individuals, small on purpose, where membership belongs to the member and not to the firm.
+            Cross-border practice runs on trust, and trust takes time to build. We are an association of individuals, small on purpose, where membership belongs to the member and not to the firm.
           </p>
         </div>
       </div>

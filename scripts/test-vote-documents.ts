@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   chunkCountFor,
   clientFileProblem,
@@ -124,7 +124,15 @@ assert.equal(contentDisposition("inline", "bad\"name\r\n.pdf"), "inline; filenam
 const partial = inspectVoteDocument("note.docx", "", docx.subarray(0, 80), { partial: true });
 assert.equal(partial.ok, true);
 
-const migration = readFileSync(new URL("../db/migrations/014_vote_document_uploads.sql", import.meta.url), "utf8");
+const migrationDir = new URL("../db/migrations/", import.meta.url);
+const migrationNames = readdirSync(migrationDir).filter((name) => name.endsWith(".sql"));
+const numbered = migrationNames.map((name) => /^(\d+)/.exec(name)?.[1]).filter((value): value is string => Boolean(value));
+assert.equal(new Set(numbered).size, numbered.length, "migration numbers must be unique");
+assert.deepEqual(migrationNames.filter((name) => name.startsWith("014_")), ["014_member_public_profiles.sql"]);
+assert.equal(migrationNames.some((name) => name.startsWith("015_")), false);
+assert.ok(migrationNames.includes("016_vote_document_uploads.sql"));
+
+const migration = readFileSync(new URL("../db/migrations/016_vote_document_uploads.sql", import.meta.url), "utf8");
 assert.match(migration, /ADD COLUMN upload_token/);
 assert.match(migration, /CREATE TABLE upload_sessions/);
 assert.doesNotMatch(migration, /\bDELETE\s+FROM\b/i);

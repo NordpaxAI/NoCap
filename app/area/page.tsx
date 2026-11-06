@@ -4,6 +4,7 @@ import { loadAreaFrame, requireUser } from "@/lib/auth";
 import { fetchDashboard } from "@/lib/area-data";
 import { formatShort, questionStatus } from "@/lib/time";
 import { closedVoteLine } from "@/lib/poll";
+import { VoteBars } from "@/components/vote-bars";
 import { VoteBadge } from "@/components/vote-badge";
 
 const VOTE_PAGE = 6;
@@ -93,7 +94,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </div>
                 <Link className="title" href={`/area/votes/${vote.id}`}>{vote.subject}</Link>
                 {vote.status === "open" ? (
-                  <div className="by">{vote.ballots} of {vote.eligible} voted · closes {formatShort(vote.deadline)}</div>
+                  <>
+                    <div className="by">closes {formatShort(vote.deadline)}</div>
+                    <VoteBars
+                      compact
+                      eligible={vote.eligible}
+                      forCount={vote.live_for}
+                      againstCount={vote.live_against}
+                      abstainCount={vote.live_abstain}
+                      participants={vote.ballots}
+                      quorum={Number(vote.quorum_constitutive)}
+                      majority={Number(vote.quorum_deliberative)}
+                      poll={vote.kind === "poll"}
+                    />
+                  </>
                 ) : (
                   <div className="by">{vote.author} · {formatShort(vote.opened_at)}</div>
                 )}

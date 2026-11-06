@@ -24,8 +24,8 @@ export default async function PublicationsPage() {
     <div className="wrap inner">
       <div className="eyebrow">Publications</div>
       <h1 className="pt">Written by members, for people who do the work.</h1>
-      <p className="lede">
-        Articles, interviews and cross-border reads on deal features, structuring quirks, legislative developments and market trends - each one under the name of the member behind it.
+      <p className="about-lede">
+        Articles, interviews and cross-border reads on deal features, structuring quirks, legislative developments and market trends, each one under the name of the member behind it.
       </p>
       <div className="pubs-grid">
         {rows.map((row) => (

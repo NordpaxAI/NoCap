@@ -1,3 +1,4 @@
+import { VoteBars } from "@/components/vote-bars";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
@@ -151,6 +152,16 @@ export default async function VotePage({
             ? " · the deliberative quorum does not apply"
             : ` · majority ${vote.quorum_deliberative}% For, calculated on For and Against only (abstentions count for the constitutive quorum only)`}
         </p>
+        <VoteBars
+          eligible={open ? roll.length : (vote.eligible_count ?? roll.length)}
+          forCount={open ? roll.filter((p) => p.choice === "for").length : (vote.for_count ?? 0)}
+          againstCount={open ? roll.filter((p) => p.choice === "against").length : (vote.against_count ?? 0)}
+          abstainCount={open ? roll.filter((p) => p.choice === "abstain").length : (vote.abstain_count ?? 0)}
+          participants={open ? voted.length : (vote.voted_count ?? voted.length)}
+          quorum={Number(vote.quorum_constitutive)}
+          majority={Number(vote.quorum_deliberative)}
+          poll={poll}
+        />
         {excluded.length ? (
           <p className="by">
             Excluded from this vote by the admin (not eligible, not counted for the quorum): {excluded.map((person) => person.name).join(", ")}.

@@ -34,17 +34,32 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   );
   return (
     <>
-      <p className="eyebrow">{doc.area === "register" ? "Official register" : "Shared folder"}</p>
+      <p className="eyebrow">
+        {doc.category === "minutes" ? "Minutes" : doc.category === "charter" || doc.category === "code_of_conduct" ? "Charter" : "Other documents"}
+      </p>
       <h1 className="page-title">{doc.title}</h1>
-      <p className="help">{doc.category.replaceAll("_", " ")}{doc.immutable ? " · cannot be changed" : ""}</p>
+      {doc.immutable ? <p className="help">Cannot be changed.</p> : null}
       <div className="docs">
-        {versions.map((version) => (
+        {versions.slice(0, 1).map((version) => (
           <a className="doc" key={version.id} href={`/api/documents/versions/${version.id}`}>
-            <span className="doc-name">Version {version.version_number} — {version.filename}</span>
-            <span className="doc-meta">{version.display_name} · {formatWhen(version.uploaded_at)} · {Math.ceil(version.byte_size / 1024)} KB</span>
+            <span className="doc-name">{version.filename}</span>
+            <span className="doc-meta">v{version.version_number} · {Math.ceil(version.byte_size / 1024)} KB</span>
           </a>
         ))}
       </div>
+      {user.role === "admin" && versions.length > 1 ? (
+        <details style={{ marginTop: 14 }}>
+          <summary className="help">Earlier versions (admins only, kept on file)</summary>
+          <div className="docs">
+            {versions.slice(1).map((version) => (
+              <a className="doc" key={version.id} href={`/api/documents/versions/${version.id}`}>
+                <span className="doc-name">Version {version.version_number} — {version.filename}</span>
+                <span className="doc-meta">{version.display_name} · {formatWhen(version.uploaded_at)} · {Math.ceil(version.byte_size / 1024)} KB</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      ) : null}
       {!doc.immutable && doc.area === "register" && user.role === "admin" ? (
         <ActionForm action={uploadRegister} className="stack">
           <input type="hidden" name="document_id" value={doc.id} />
