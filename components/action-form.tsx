@@ -28,12 +28,14 @@ export function ActionForm({
   children,
   method = "post",
   style,
+  intercept,
 }: {
-  action: ((formData: FormData) => void | Promise<void>) | string;
+  action: ((formData: FormData) => void | Promise<unknown>) | string;
   className?: string;
   children: React.ReactNode;
   method?: "get" | "post";
   style?: React.CSSProperties;
+  intercept?: (formData: FormData) => Promise<void>;
 }) {
   const [token] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
@@ -48,7 +50,7 @@ export function ActionForm({
   return (
     <FormBusy.Provider value={busy}>
       <form
-        action={action}
+        action={action as (formData: FormData) => void | Promise<void>}
         className={className}
         style={style}
         method={tracked ? undefined : method}
@@ -59,7 +61,8 @@ export function ActionForm({
           }
           let total = 0;
           for (const input of Array.from(event.currentTarget.querySelectorAll<HTMLInputElement>('input[type="file"]'))) {
-            if (input.dataset.clientResize === "true") continue;
+            // external-upload inputs are sent in parts by the page, not in this form body.
+            if (input.dataset.clientResize === "true" || input.dataset.externalUpload === "true") continue;
             for (const file of Array.from(input.files || [])) total += file.size;
           }
           if (total > MAX_UPLOAD_BYTES) {
@@ -70,8 +73,22 @@ export function ActionForm({
             return;
           }
           setSizeError(null);
+          if (!intercept) {
+            lock.current = true;
+            setBusy(true);
+            return;
+          }
+          event.preventDefault();
           lock.current = true;
           setBusy(true);
+          const formData = new FormData(event.currentTarget);
+          void intercept(formData)
+            .catch((error: unknown) => {
+              const digest = typeof error === "object" && error !== null && "digest" in error ? String((error as { digest?: unknown }).digest) : "";
+              if (digest.startsWith("NEXT_REDIRECT")) throw error;
+              console.error(error);
+            })
+            .finally(release);
         }}
       >
         <ReleaseLock onIdle={release} />

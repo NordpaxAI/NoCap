@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { AddVoteDocuments } from "@/components/add-vote-documents";
 import { DeleteControl } from "@/components/delete-control";
 import { SubmitButton } from "@/components/submit-button";
+import { VoteDocumentList, type VoteDocumentFile } from "@/components/vote-documents";
 import { castVote, deleteVote, remindVoters } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
 import { pool } from "@/lib/db";
@@ -56,7 +58,7 @@ export default async function VotePage({
     author: string;
     roll: RollRow[] | null;
     options: OptionRow[] | null;
-    files: { id: string; filename: string }[] | null;
+    files: VoteDocumentFile[] | null;
   }>(
     `SELECT v.id, v.subject, v.description, v.status, v.kind, v.allow_multiple,
             v.opened_by,
@@ -98,7 +100,9 @@ export default async function VotePage({
               WHERE o.vote_id = v.id
             ), '[]'::json) AS options,
             COALESCE((
-              SELECT json_agg(json_build_object('id', a.id, 'filename', a.filename) ORDER BY a.filename)
+              SELECT json_agg(json_build_object(
+                       'id', a.id, 'filename', a.filename, 'mime_type', a.mime_type, 'byte_size', a.byte_size
+                     ) ORDER BY a.uploaded_at, a.filename)
               FROM attachments a
               WHERE a.parent_type = 'vote' AND a.parent_id = v.id
             ), '[]'::json) AS files
@@ -158,12 +162,13 @@ export default async function VotePage({
             {" "}There is no abstain choice. A member who does not answer has not voted.
           </p>
         ) : null}
-        {files.length ? (
-          <p className="by">
-            {files.map((file) => (
-              <a key={file.id} href={`/api/attachments/${file.id}`}>{file.filename} </a>
-            ))}
-          </p>
+        <VoteDocumentList files={files} />
+        {open && user.role === "admin" ? (
+          <AddVoteDocuments
+            voteId={vote.id}
+            usedCount={files.length}
+            usedBytes={files.reduce((sum, file) => sum + Number(file.byte_size), 0)}
+          />
         ) : null}
 
         {open && mine && !answered(mine) && !poll ? (

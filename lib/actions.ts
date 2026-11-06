@@ -16,11 +16,14 @@ import {
   requireUser,
   startSession,
   tokenHash,
+  type Member,
 } from "./auth";
 import { appLink, sendEmail } from "./email";
 import { notifyMany } from "./notify";
 import { env } from "./env";
 import { readUpload, safeFilename, storageDelete, storagePut } from "./storage";
+import { newUploadToken, storeVoteDocumentBytes } from "./vote-document-store";
+import { VOTE_DOCUMENT_MAX_BYTES } from "./vote-documents";
 import type { PoolClient } from "pg";
 import { parseClubDateTime } from "./time";
 import { closeDueVotes } from "./votes";
@@ -594,8 +597,13 @@ export async function remindQuestion(formData: FormData) {
   redirect(`/area/questions/${questionId}?reminded=1`);
 }
 
-export async function openVote(formData: FormData) {
+export async function openVote(formData: FormData): Promise<{ id: string; duplicate: boolean } | { error: string } | void> {
   const admin = await requireAdmin();
+  const defer = formData.get("defer_attachments") === "1";
+  const fail = (message: string): { error: string } => {
+    if (defer) return { error: message };
+    go("/area/votes/new", message);
+  };
   const kind = String(formData.get("kind") || "standard");
   const subject = String(formData.get("subject") || "").trim();
   const description = String(formData.get("description") || "").trim();
@@ -608,27 +616,28 @@ export async function openVote(formData: FormData) {
   const excluded = [...new Set(formData.getAll("exclude").map((value) => String(value)))].filter((value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
   );
-  if (kind !== "standard" && kind !== "poll") go("/area/votes/new", "Choose a standard vote or a poll.");
-  if (!subject || !description || !deadlineRaw) go("/area/votes/new", "Subject, description and deadline are required.");
+  if (kind !== "standard" && kind !== "poll") return fail("Choose a standard vote or a poll.");
+  if (!subject || !description || !deadlineRaw) return fail("Subject, description and deadline are required.");
   if (!Number.isFinite(qc) || qc < 0 || qc > 100) {
-    go("/area/votes/new", "The constitutive quorum is a percentage from 0 to 100.");
+    return fail("The constitutive quorum is a percentage from 0 to 100.");
   }
   if (!poll && (!Number.isFinite(qd) || qd < 0 || qd > 100)) {
-    go("/area/votes/new", "Both quorums are percentages from 0 to 100.");
+    return fail("Both quorums are percentages from 0 to 100.");
   }
   if (poll && (options.length < 2 || options.length > 10)) {
-    go("/area/votes/new", "A poll needs between 2 and 10 options.");
+    return fail("A poll needs between 2 and 10 options.");
   }
   let deadline: Date;
   try {
     deadline = parseClubDateTime(deadlineRaw);
   } catch (error) {
-    go("/area/votes/new", errorMessage(error));
+    return fail(errorMessage(error));
   }
   if (deadline.getTime() <= Date.now() + 48 * 60 * 60 * 1000) {
-    go("/area/votes/new", "A vote must stay open for longer than 48 hours, so both reminders can go out.");
+    return fail("A vote must stay open for longer than 48 hours, so both reminders can go out.");
   }
   let voteId = "";
+  let duplicate = false;
   try {
     const outcome = await guardedCreate(
       admin.id,
@@ -663,8 +672,11 @@ export async function openVote(formData: FormData) {
       },
     );
     voteId = outcome.id;
+    duplicate = outcome.duplicate;
+    if (!outcome.duplicate && !defer) {
+      await saveVoteDocumentsFromForm(formData, voteId, admin);
+    }
     if (!outcome.duplicate) {
-      await saveAttachments(formData, "vote", voteId, admin.id);
       const { rows: people } = await pool.query<{ id: string; email: string }>(
         `SELECT p.id, p.email
          FROM vote_electorate e
@@ -696,9 +708,10 @@ export async function openVote(formData: FormData) {
       );
     }
   } catch (error) {
-    go("/area/votes/new", errorMessage(error));
+    return fail(errorMessage(error));
   }
   revalidatePath("/area");
+  if (defer) return { id: voteId, duplicate };
   redirect(`/area/votes/${voteId}`);
 }
 
@@ -841,6 +854,21 @@ export async function createPublication(formData: FormData) {
   revalidatePath("/publications", "layout");
   revalidatePath("/");
   redirect(`/publications/${slug}`);
+}
+
+async function saveVoteDocumentsFromForm(formData: FormData, voteId: string, user: Member) {
+  for (const entry of formData.getAll("attachments")) {
+    const file = await readUpload(entry, { maxBytes: VOTE_DOCUMENT_MAX_BYTES, kinds: "any" });
+    if (!file) continue;
+    await storeVoteDocumentBytes({
+      user,
+      voteId,
+      uploadToken: newUploadToken(),
+      filename: file.filename,
+      declaredMime: file.mime,
+      bytes: new Uint8Array(file.buffer),
+    });
+  }
 }
 
 async function saveAttachments(formData: FormData, parentType: string, parentId: string, userId: string) {
