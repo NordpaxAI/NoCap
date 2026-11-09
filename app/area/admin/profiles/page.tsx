@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { setMemberPaymentLink } from "@/lib/payment-actions";
 import { reviewPublicProfile } from "@/lib/profile-actions";
 import Link from "next/link";
 import { formatShort } from "@/lib/time";
@@ -43,7 +44,14 @@ function Card({ row }: { row: Row }) {
   );
 }
 
-type Tracker = { id: string; display_name: string; status: TrackerStatus };
+type Tracker = {
+  id: string;
+  display_name: string;
+  status: TrackerStatus;
+  payment_link_url: string | null;
+  payment_amount_eur: number | null;
+  payment_label: string | null;
+};
 type TrackerStatus = "not_started" | "awaiting" | "changes" | "approved" | "published";
 const TRACKER_LABEL: Record<TrackerStatus, string> = {
   not_started: "Not started",
@@ -60,11 +68,11 @@ function reminderText(name: string, status: TrackerStatus): string {
     : `Hi ${first}! Quick reminder to fill in your nocap public profile: private area → Profile, add photo, name, bio (third person, 60–100 words), city and country, save and press "Submit for review". Thanks!`;
 }
 
-export default async function AdminProfilesPage({ searchParams }: { searchParams: Promise<{ status?: string; draft?: string }> }) {
+export default async function AdminProfilesPage({ searchParams }: { searchParams: Promise<{ status?: string; draft?: string; pay_ok?: string; pay_error?: string }> }) {
   await requireAdmin();
-  const { status: filter = "all", draft } = await searchParams;
+  const { status: filter = "all", draft, pay_ok, pay_error } = await searchParams;
   const { rows: tracker } = await pool.query<Tracker>(
-    `SELECT p.id, p.display_name,
+    `SELECT p.id, p.display_name, p.payment_link_url, p.payment_amount_eur, p.payment_label,
             CASE WHEN m.profile_id IS NULL THEN 'not_started'
                  WHEN m.status = 'submitted' THEN 'awaiting'
                  WHEN m.status = 'changes_requested' THEN 'changes'
@@ -190,6 +198,90 @@ export default async function AdminProfilesPage({ searchParams }: { searchParams
           ) : null}
         </section>
       ))}
+
+      <div className="head" id="payment" style={{ marginTop: 36 }}>
+        <div className="eyebrow">Payment links</div>
+      </div>
+      <p className="help">
+        Admin only · paste a Stripe Payment Link (https). The member sees a &quot;Cuota de miembro&quot; card on their private dashboard only when a link is set. No Stripe API keys are stored here.
+      </p>
+      {pay_ok ? <p className="note" style={{ margin: "12px 0" }}>Payment link saved.</p> : null}
+      {pay_error ? <p className="note" style={{ margin: "12px 0" }}>{pay_error}</p> : null}
+      <table style={{ marginTop: 12 }}>
+        <thead>
+          <tr><th>Member</th><th>Link / amount</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {tracker.map((t) => (
+            <tr key={`pay-${t.id}`}>
+              <td style={{ verticalAlign: "top" }}>
+                {t.display_name}
+                {t.payment_link_url ? (
+                  <div className="help" style={{ marginTop: 4 }}>
+                    Set · {Number(t.payment_amount_eur ?? 225).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
+                  </div>
+                ) : (
+                  <div className="help" style={{ marginTop: 4 }}>No link</div>
+                )}
+              </td>
+              <td style={{ verticalAlign: "top" }}>
+                <form action={setMemberPaymentLink} className="stack" style={{ gap: 8, margin: 0 }}>
+                  <input type="hidden" name="profile_id" value={t.id} />
+                  <label className="help" htmlFor={`pay-url-${t.id}`} style={{ margin: 0 }}>Stripe Payment Link URL</label>
+                  <input
+                    id={`pay-url-${t.id}`}
+                    name="payment_link_url"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://buy.stripe.com/…"
+                    defaultValue={t.payment_link_url ?? ""}
+                    style={{ width: "100%", minWidth: 220 }}
+                  />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div>
+                      <label className="help" htmlFor={`pay-amt-${t.id}`} style={{ margin: 0 }}>Amount (€)</label>
+                      <input
+                        id={`pay-amt-${t.id}`}
+                        name="payment_amount_eur"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        defaultValue={t.payment_amount_eur ?? 225}
+                        style={{ width: 100 }}
+                      />
+                    </div>
+                    <div style={{ flex: "1 1 140px" }}>
+                      <label className="help" htmlFor={`pay-label-${t.id}`} style={{ margin: 0 }}>Label</label>
+                      <input
+                        id={`pay-label-${t.id}`}
+                        name="payment_label"
+                        type="text"
+                        maxLength={120}
+                        defaultValue={t.payment_label ?? "Cuota de miembro"}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn solid" type="submit">Save link</button>
+                  </div>
+                </form>
+              </td>
+              <td style={{ verticalAlign: "top" }}>
+                {t.payment_link_url ? (
+                  <form action={setMemberPaymentLink}>
+                    <input type="hidden" name="profile_id" value={t.id} />
+                    <input type="hidden" name="clear" value="1" />
+                    <button className="btn" type="submit">Clear</button>
+                  </form>
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </>
   );
 }

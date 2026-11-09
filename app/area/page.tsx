@@ -2,10 +2,17 @@ import Link from "next/link";
 import { DocIcon } from "@/components/members-shell";
 import { loadAreaFrame, requireUser } from "@/lib/auth";
 import { fetchDashboard } from "@/lib/area-data";
+import { pool } from "@/lib/db";
 import { formatShort, questionStatus } from "@/lib/time";
 import { closedVoteLine } from "@/lib/poll";
 import { VoteBars } from "@/components/vote-bars";
 import { VoteBadge } from "@/components/vote-badge";
+
+type OwnPayment = {
+  payment_link_url: string | null;
+  payment_amount_eur: number | null;
+  payment_label: string | null;
+};
 
 const VOTE_PAGE = 6;
 
@@ -21,6 +28,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const limits: Record<SectionKey, number> = { t: limitOf(params.t), v: limitOf(params.v), o: limitOf(params.o) };
   const data = await fetchDashboard(user.id, 500);
+  const { rows: payRows } = await pool.query<OwnPayment>(
+    `SELECT payment_link_url, payment_amount_eur, payment_label
+     FROM profiles WHERE id = $1`,
+    [user.id],
+  );
+  const payment = payRows[0];
+  const paymentLink = payment?.payment_link_url?.trim() || null;
+  const paymentAmount = payment?.payment_amount_eur ?? 225;
+  const paymentLabel = (payment?.payment_label || "Cuota de miembro").trim();
   const sections = [
     { key: "t" as const, title: "To vote", empty: "Nothing to vote on right now.", items: data.votes.filter((vote) => vote.my_status === "to_vote") },
     { key: "v" as const, title: "Voted", empty: "", items: data.votes.filter((vote) => vote.my_status === "voted") },
@@ -44,6 +60,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             You have {toVote} open vote{toVote === 1 ? "" : "s"} to cast.
           </Link>
         </p>
+      ) : null}
+      {paymentLink ? (
+        <article className="thread" style={{ marginBottom: 18 }} id="cuota">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>{paymentLabel}</div>
+          <p style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 700 }}>
+            {Number(paymentAmount).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
+          </p>
+          <p className="help" style={{ margin: "0 0 14px" }}>Pago mediante factura</p>
+          <a className="btn solid" href={paymentLink} target="_blank" rel="noopener noreferrer">
+            Pagar cuota
+          </a>
+        </article>
       ) : null}
       <div className="head">
         <div className="eyebrow">Documents</div>
