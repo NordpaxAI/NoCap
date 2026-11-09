@@ -67,7 +67,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 700 }}>
             {Number(paymentAmount).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
           </p>
-          <p className="help" style={{ margin: "0 0 14px" }}>Pago mediante factura · gestionado por Sites by Sunrise</p>
+          <p className="help" style={{ margin: "0 0 14px" }}>Pago mediante factura · gestionado por NordPax</p>
           <a className="btn solid" href={paymentLink} target="_blank" rel="noopener noreferrer">
             Pagar cuota
           </a>
